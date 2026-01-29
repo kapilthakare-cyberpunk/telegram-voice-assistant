@@ -1,0 +1,27 @@
+# Render Blueprint - ChatEasezy Backend
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: chateaszy-backend
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: TELEGRAM_API_ID
+        sync: false
+      - key: TELEGRAM_API_HASH
+        sync: false
+      - key: TELEGRAM_PHONE
+        sync: false
+      - key: TELEGRAM_SESSION_STRING
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AI_PROVIDER
+        value: groq
+    healthCheckPath: /health
+    autoDeploy: true
