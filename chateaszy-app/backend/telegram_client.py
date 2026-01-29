@@ -1,20 +1,22 @@
 """
 Telegram Client Service - Telethon wrapper for ChatEasezy
-Handles authentication and message sending
+Handles authentication and message sending via StringSession
 """
 
 import asyncio
+import os
 from typing import Optional
 from telethon import TelegramClient
+from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError
 from telethon.tl.types import User
 
 
 class TelegramService:
-    def __init__(self, api_id: int, api_hash: str, session_path: str):
+    def __init__(self, api_id: int, api_hash: str, session_string: Optional[str] = None):
         self.api_id = api_id
         self.api_hash = api_hash
-        self.session_path = session_path
+        self.session_string = session_string or ""
         self.client: Optional[TelegramClient] = None
         self.phone: Optional[str] = None
         self.phone_code_hash: Optional[str] = None
@@ -25,10 +27,10 @@ class TelegramService:
         return self._is_connected and self.client is not None
     
     async def connect(self):
-        """Connect to Telegram (assumes already authenticated)"""
+        """Connect to Telegram using StringSession"""
         if self.client is None:
             self.client = TelegramClient(
-                self.session_path,
+                StringSession(self.session_string),
                 self.api_id,
                 self.api_hash
             )
@@ -52,7 +54,7 @@ class TelegramService:
         try:
             if self.client is None:
                 self.client = TelegramClient(
-                    self.session_path,
+                    StringSession(self.session_string),
                     self.api_id,
                     self.api_hash
                 )
@@ -125,8 +127,12 @@ class TelegramService:
             user = await self.client.get_me()
             self._is_connected = True
             
+            # Get new session string for storage
+            new_session_string = self.client.session.save()
+            
             return {
                 "success": True,
+                "session_string": new_session_string,
                 "user": {
                     "id": user.id,
                     "first_name": user.first_name,

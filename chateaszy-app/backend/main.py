@@ -21,9 +21,10 @@ app = FastAPI(
 )
 
 # CORS for frontend
+cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this for production
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,7 +32,6 @@ app.add_middleware(
 
 # Config paths
 CONFIG_PATH = Path(os.getenv("CONFIG_PATH", "./data/config.json"))
-SESSION_PATH = Path(os.getenv("SESSION_PATH", "./data/chateaszy.session"))
 
 # Initialize services
 telegram_service: Optional[TelegramService] = None
@@ -109,20 +109,30 @@ class HealthResponse(BaseModel):
 async def startup():
     global telegram_service, grammar_fixer
     
-    config = load_config()
-    
     # Initialize grammar fixer
     grammar_fixer = GrammarFixer()
     
-    # Initialize Telegram if credentials exist
-    creds = config.get("telegram_credentials")
-    if creds and SESSION_PATH.exists():
-        telegram_service = TelegramService(
-            api_id=creds["api_id"],
-            api_hash=creds["api_hash"],
-            session_path=str(SESSION_PATH)
-        )
-        await telegram_service.connect()
+    # Initialize Telegram from environment variables
+    api_id = os.getenv("TELEGRAM_API_ID")
+    api_hash = os.getenv("TELEGRAM_API_HASH")
+    session_string = os.getenv("TELEGRAM_SESSION_STRING")
+    
+    if api_id and api_hash and session_string:
+        try:
+            telegram_service = TelegramService(
+                api_id=int(api_id),
+                api_hash=api_hash,
+                session_string=session_string
+            )
+            connected = await telegram_service.connect()
+            if connected:
+                print("✅ Telegram connected successfully!")
+            else:
+                print("⚠️ Telegram client created but not authorized")
+        except Exception as e:
+            print(f"❌ Failed to connect to Telegram: {e}")
+    else:
+        print("⚠️ Telegram credentials not found in environment variables")
 
 
 @app.on_event("shutdown")
@@ -149,8 +159,7 @@ async def start_auth(request: AuthRequest):
     
     telegram_service = TelegramService(
         api_id=request.api_id,
-        api_hash=request.api_hash,
-        session_path=str(SESSION_PATH)
+        api_hash=request.api_hash
     )
     
     result = await telegram_service.start_auth(request.phone)
